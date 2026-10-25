@@ -1,0 +1,52 @@
+name: Build portable mp3splt 2.6.2 (Windows x64)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            curl tar unzip zip make
+            mingw-w64-ucrt-x86_64-autotools
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-binutils
+            mingw-w64-ucrt-x86_64-libmad
+            mingw-w64-ucrt-x86_64-libid3tag
+            mingw-w64-ucrt-x86_64-libogg
+            mingw-w64-ucrt-x86_64-libvorbis
+            mingw-w64-ucrt-x86_64-flac
+            mingw-w64-ucrt-x86_64-libltdl
+            mingw-w64-ucrt-x86_64-zlib
+            mingw-w64-ucrt-x86_64-ffmpeg
+      - name: Compile pinned mp3splt 2.6.2
+        run: bash scripts/build.sh
+      - name: Collect portable DLLs
+        run: bash scripts/package.sh
+      - name: Generate synthetic MP3 fixture
+        run: |
+          mkdir -p testdata
+          ffmpeg -hide_banner -loglevel error -f lavfi -i 'sine=frequency=523:duration=4' -ac 2 -ar 44100 -codec:a libmp3lame -b:a 96k -y testdata/reference_4s.mp3
+      - name: Smoke test without MSYS2 on PATH
+        shell: pwsh
+        run: ./scripts/test-windows.ps1
+      - name: Create ZIP and SHA256
+        run: bash scripts/archive.sh
+      - name: Upload tested artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mp3splt-2.6.2-windows-x64-verified
+          path: |
+            output/mp3splt-2.6.2-windows-x64.zip
+            output/mp3splt-2.6.2-windows-x64.zip.sha256
+          if-no-files-found: error
