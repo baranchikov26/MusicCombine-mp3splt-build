@@ -19,17 +19,17 @@ export CPPFLAGS="-I$BUILD/stage/include"
 export LDFLAGS="-L$BUILD/stage/lib"
 export PATH="$BUILD/stage/bin:$PATH"
 export CFLAGS="-O2 -std=gnu11 -Wno-error=implicit-function-declaration"
+# This historical source hardcodes '/lib/libz.a' in its Windows
+# Automake rules. On modern UCRT64, use the toolchain's -lz instead.
+# Patch both Automake source and distributed Makefile.in before configure
+# so generated makefiles cannot reintroduce the obsolete absolute path.
+for mk in "$LIB_DIR/src/Makefile.am" "$LIB_DIR/src/Makefile.in"; do
+  if [[ -f "$mk" ]]; then
+    sed -i 's@/lib/libz\\.a@-lz@g' "$mk"
+  fi
+done
 cd "$LIB_DIR"
 ./configure --prefix="$BUILD/stage" --enable-win --enable-mp3 --enable-id3tag --disable-ogg --disable-flac --disable-pcre --disable-cutter --disable-doxygen_doc
-# The 2017 Autotools release occasionally resolves zlib to /lib/libz.a
-# under modern MSYS2 UCRT64. Only replace this known invalid absolute
-# path with the verified UCRT64 target; never link against MSYS zlib.
-if grep -RFlq '/lib/libz.a' --include='Makefile' "$LIB_DIR"; then
-  test -f /ucrt64/lib/libz.a || { echo 'Missing UCRT64 zlib static archive'; exit 1; }
-  while IFS= read -r makefile; do
-    sed -i -E 's@(^|[[:space:]])/lib/libz\\.a@\\1/ucrt64/lib/libz.a@g' "$makefile"
-  done < <(grep -RFl '/lib/libz.a' --include='Makefile' "$LIB_DIR")
-fi
 make -j2
 make install
 find "$BUILD/stage" -type f -iname '*splt*mp3*.dll' | grep -q .
