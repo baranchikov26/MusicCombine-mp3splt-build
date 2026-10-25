@@ -1,0 +1,47 @@
+name: Publish validated portable mp3splt
+on:
+  push:
+    paths:
+      - .github/workflows/publish-verified-mp3splt.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download successful Windows build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mp3splt-2.6.2-windows-x64-verified
+          run-id: 40224778314
+          repository: baranchikov26/MusicCombine-mp3splt-build
+          github-token: ${{ github.token }}
+          path: releasefiles
+      - name: Verify archive checksum from Windows build
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd releasefiles
+          sha256sum -c mp3splt-2.6.2-windows-x64.zip.sha256
+          unzip -tq mp3splt-2.6.2-windows-x64.zip
+      - name: Publish immutable initial release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="mp3splt-2.6.2-ucrt64-v1"
+          REPO="${GITHUB_REPOSITORY}"
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; no overwrite performed"
+            exit 0
+          fi
+          gh release create "$TAG" \
+            releasefiles/mp3splt-2.6.2-windows-x64.zip \
+            releasefiles/mp3splt-2.6.2-windows-x64.zip.sha256 \
+            --repo "$REPO" \
+            --target "87b4428a571ae9f7f0849b24e87e71cf28ab7fdd" \
+            --title "mp3splt 2.6.2 portable Windows x64 (UCRT64) — build 1" \
+            --notes "Built from the sha256-pinned Debian mp3splt 2.6.2+20170630 sources. Tested on Windows GitHub Actions: clean DLL-only PATH, version command, synthetic MP3 splitting without re-encoding. Includes bundled runtime DLLs and source/license information. Source build run: https://github.com/baranchikov26/MusicCombine-mp3splt-build/actions/runs/40224778314"
