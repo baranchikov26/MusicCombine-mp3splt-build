@@ -3,6 +3,12 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    paths:
+      - '.github/workflows/build-mp3splt-windows.yml'
+      - 'scripts/build.sh'
+      - 'scripts/package.sh'
+      - 'scripts/archive.sh'
+      - 'scripts/test-windows.ps1'
 permissions:
   contents: read
 jobs:
