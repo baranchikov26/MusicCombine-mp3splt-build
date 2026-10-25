@@ -25,11 +25,16 @@ export CFLAGS="-O2 -std=gnu11 -Wno-error=implicit-function-declaration"
 # so generated makefiles cannot reintroduce the obsolete absolute path.
 for mk in "$LIB_DIR/src/Makefile.am" "$LIB_DIR/src/Makefile.in"; do
   if [[ -f "$mk" ]]; then
-    sed -i 's@/lib/libz\\.a@-lz@g' "$mk"
+    sed -i 's@/lib/libz[.]a@-lz@g' "$mk"
   fi
 done
 cd "$LIB_DIR"
 ./configure --prefix="$BUILD/stage" --enable-win --enable-mp3 --enable-id3tag --disable-ogg --disable-flac --disable-pcre --disable-cutter --disable-doxygen_doc
+# Fail early if Autotools reintroduces the legacy /lib/libz.a path.
+if grep -Fq '/lib/libz.a' "$LIB_DIR/src/Makefile"; then
+  echo 'ERROR: unresolved legacy zlib linkage in generated Makefile' >&2
+  exit 1
+fi
 make -j2
 make install
 find "$BUILD/stage" -type f -iname '*splt*mp3*.dll' | grep -q .
