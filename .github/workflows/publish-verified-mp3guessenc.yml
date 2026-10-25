@@ -1,0 +1,50 @@
+name: Publish verified mp3guessenc Windows x64
+on:
+  workflow_run:
+    workflows: ["Build mp3guessenc Windows x64"]
+    types: [completed]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download only the successful Windows test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: mp3guessenc-0.27.6beta-windows-x64-verified
+          run-id: ${{ github.event.workflow_run.id }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: releasefiles
+      - name: Check distributable integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd releasefiles
+          sha256sum -c mp3guessenc-0.27.6beta-windows-x64.zip.sha256
+          unzip -tq mp3guessenc-0.27.6beta-windows-x64.zip
+          unzip -Z1 mp3guessenc-0.27.6beta-windows-x64.zip | grep -qx 'mp3guessenc.exe'
+          unzip -Z1 mp3guessenc-0.27.6beta-windows-x64.zip | grep -qx 'LICENSE.txt'
+      - name: Publish one immutable initial GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          TAG="mp3guessenc-0.27.6beta-ucrt64-v1"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release exists; will not replace validated binaries"
+            exit 0
+          fi
+          gh release create "$TAG" \
+            releasefiles/mp3guessenc-0.27.6beta-windows-x64.zip \
+            releasefiles/mp3guessenc-0.27.6beta-windows-x64.zip.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$BUILD_SHA" \
+            --title "mp3guessenc 0.27.6 beta — portable Windows x64 (UCRT64)" \
+            --notes "SHA256-pinned Debian source mp3guessenc 0.27.6~beta+dfsg, built in MSYS2 UCRT64. Verified native Windows execution and MPEG encoder statistics with CBR and VBR synthetic MP3 samples; includes LGPL license and a source provenance manifest. Source: https://deb.debian.org/debian/pool/main/m/mp3guessenc/"
