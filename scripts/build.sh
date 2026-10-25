@@ -19,29 +19,26 @@ export CPPFLAGS="-I$BUILD/stage/include"
 export LDFLAGS="-L$BUILD/stage/lib"
 export PATH="$BUILD/stage/bin:$PATH"
 export CFLAGS="-O2 -std=gnu11 -Wno-error=implicit-function-declaration"
-# This historical source hardcodes '/lib/libz.a' in its Windows
-# Automake rules. On modern UCRT64, use the toolchain's -lz instead.
-# Patch both Automake source and distributed Makefile.in before configure
-# so generated makefiles cannot reintroduce the obsolete absolute path.
+# The original 2017 Windows rules hardcode /lib/libz.a.
+# Use the actual UCRT64 static archive as both link input and make prerequisite.
+test -f /ucrt64/lib/libz.a || { echo 'Missing UCRT64 static zlib'; exit 1; }
 for mk in "$LIB_DIR/src/Makefile.am" "$LIB_DIR/src/Makefile.in"; do
   if [[ -f "$mk" ]]; then
-    sed -i 's@/lib/libz[.]a@-lz@g' "$mk"
+    sed -i 's@/lib/libz[.]a@/ucrt64/lib/libz.a@g' "$mk"
   fi
 done
 cd "$LIB_DIR"
 ./configure --prefix="$BUILD/stage" --enable-win --enable-mp3 --enable-id3tag --disable-ogg --disable-flac --disable-pcre --disable-cutter --disable-doxygen_doc
-# Old Automake put the original static archive in both LIBADD (linker)
-# and DEPENDENCIES (make prerequisites). -lz is a linker flag, not a file.
-# Remove it ONLY from the prerequisite list in the generated Makefile.
-sed -i -E '/^libmp3splt_la_DEPENDENCIES[[:space:]]*=/s/[[:space:]]-lz//g' "$LIB_DIR/src/Makefile"
-if grep -Fq '/lib/libz.a' "$LIB_DIR/src/Makefile"; then
-  echo 'ERROR: unresolved legacy zlib linkage in generated Makefile' >&2
+# Do not allow old Makefile prerequisites or the erroneous -lz target.
+if grep -E '^libmp3splt_la_(LIBADD|DEPENDENCIES)[[:space:]]*=' "$LIB_DIR/src/Makefile" | grep -q ' /lib/libz.a'; then
+  echo 'ERROR: obsolete zlib prerequisite persists' >&2
   exit 1
 fi
-if grep -E '^libmp3splt_la_DEPENDENCIES[[:space:]]*=' "$LIB_DIR/src/Makefile" | grep -q -- '-lz'; then
-  echo 'ERROR: -lz incorrectly present among make prerequisites' >&2
+if grep -E '^libmp3splt_la_(LIBADD|DEPENDENCIES)[[:space:]]*=' "$LIB_DIR/src/Makefile" | grep -q -- ' -lz'; then
+  echo 'ERROR: incorrect -lz make prerequisite persists' >&2
   exit 1
 fi
+grep -E '^libmp3splt_la_(LIBADD|DEPENDENCIES)[[:space:]]*=' "$LIB_DIR/src/Makefile" || true
 make -j2
 make install
 find "$BUILD/stage" -type f -iname '*splt*mp3*.dll' | grep -q .
