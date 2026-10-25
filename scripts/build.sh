@@ -30,9 +30,16 @@ for mk in "$LIB_DIR/src/Makefile.am" "$LIB_DIR/src/Makefile.in"; do
 done
 cd "$LIB_DIR"
 ./configure --prefix="$BUILD/stage" --enable-win --enable-mp3 --enable-id3tag --disable-ogg --disable-flac --disable-pcre --disable-cutter --disable-doxygen_doc
-# Fail early if Autotools reintroduces the legacy /lib/libz.a path.
+# Old Automake put the original static archive in both LIBADD (linker)
+# and DEPENDENCIES (make prerequisites). -lz is a linker flag, not a file.
+# Remove it ONLY from the prerequisite list in the generated Makefile.
+sed -i -E '/^libmp3splt_la_DEPENDENCIES[[:space:]]*=/s/(^|[[:space:]])-lz([[:space:]]|$)/\\1\\2/g' "$LIB_DIR/src/Makefile"
 if grep -Fq '/lib/libz.a' "$LIB_DIR/src/Makefile"; then
   echo 'ERROR: unresolved legacy zlib linkage in generated Makefile' >&2
+  exit 1
+fi
+if grep -E '^libmp3splt_la_DEPENDENCIES[[:space:]]*=' "$LIB_DIR/src/Makefile" | grep -q -- '-lz'; then
+  echo 'ERROR: -lz incorrectly present among make prerequisites' >&2
   exit 1
 fi
 make -j2
