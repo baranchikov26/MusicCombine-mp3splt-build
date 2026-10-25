@@ -28,3 +28,6 @@ try {
 finally {
     $env:PATH = $old
 }
+# Preserve successful analyzer classifications without propagating their
+# positive encoder-identification exit codes to the GitHub pwsh wrapper.
+$global:LASTEXITCODE = 0
