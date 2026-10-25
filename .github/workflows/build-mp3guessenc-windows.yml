@@ -1,0 +1,54 @@
+name: Build mp3guessenc Windows x64
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-mp3guessenc-windows.yml'
+      - 'scripts/build-mp3guessenc.sh'
+      - 'scripts/test-mp3guessenc.ps1'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            curl tar xz zip make
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-binutils
+            mingw-w64-ucrt-x86_64-ffmpeg
+      - name: Build from SHA256-pinned Debian 0.27.6 beta source
+        run: bash scripts/build-mp3guessenc.sh
+      - name: Generate reference CBR and VBR MP3 files
+        run: |
+          mkdir -p _build/mp3guessenc/fixtures
+          ffmpeg -hide_banner -loglevel error -f lavfi -i 'sine=frequency=440:duration=4' -ar 44100 -ac 2 -c:a libmp3lame -b:a 128k -y _build/mp3guessenc/fixtures/cbr_128k.mp3
+          ffmpeg -hide_banner -loglevel error -f lavfi -i 'sine=frequency=660:duration=4' -ar 44100 -ac 2 -c:a libmp3lame -q:a 2 -y _build/mp3guessenc/fixtures/vbr_q2.mp3
+      - name: Native Windows test without MSYS2 on PATH
+        shell: pwsh
+        run: ./scripts/test-mp3guessenc.ps1
+      - name: Create distributable ZIP and SHA256
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          (cd _build/mp3guessenc/dist && zip -q -X "$GITHUB_WORKSPACE/output/mp3guessenc-0.27.6beta-windows-x64.zip" ./*)
+          (cd output && sha256sum mp3guessenc-0.27.6beta-windows-x64.zip > mp3guessenc-0.27.6beta-windows-x64.zip.sha256)
+          unzip -tq output/mp3guessenc-0.27.6beta-windows-x64.zip
+      - name: Upload verified artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mp3guessenc-0.27.6beta-windows-x64-verified
+          path: |
+            output/mp3guessenc-0.27.6beta-windows-x64.zip
+            output/mp3guessenc-0.27.6beta-windows-x64.zip.sha256
+          if-no-files-found: error
