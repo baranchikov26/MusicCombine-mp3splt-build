@@ -23,7 +23,7 @@ jobs:
           msystem: UCRT64
           update: true
           install: >-
-            curl tar xz zip make
+            curl tar xz zip unzip make
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-binutils
             mingw-w64-ucrt-x86_64-ffmpeg
