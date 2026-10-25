@@ -33,7 +33,7 @@ cd "$LIB_DIR"
 # Old Automake put the original static archive in both LIBADD (linker)
 # and DEPENDENCIES (make prerequisites). -lz is a linker flag, not a file.
 # Remove it ONLY from the prerequisite list in the generated Makefile.
-sed -i -E '/^libmp3splt_la_DEPENDENCIES[[:space:]]*=/s/(^|[[:space:]])-lz([[:space:]]|$)/\\1\\2/g' "$LIB_DIR/src/Makefile"
+sed -i -E '/^libmp3splt_la_DEPENDENCIES[[:space:]]*=/s/[[:space:]]-lz//g' "$LIB_DIR/src/Makefile"
 if grep -Fq '/lib/libz.a' "$LIB_DIR/src/Makefile"; then
   echo 'ERROR: unresolved legacy zlib linkage in generated Makefile' >&2
   exit 1
